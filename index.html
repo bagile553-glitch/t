@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>이레의테트리스</title>
+    <title>이레의 테트리스</title>
     <style>
         /* CSS: 디자인 및 레이아웃 */
         body {
@@ -156,4 +156,180 @@
             'I': { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: 'I' },
             'J': { shape: [[1,0,0],[1,1,1],[0,0,0]], color: 'J' },
             'L': { shape: [[0,0,1],[1,1,1],[0,0,0]], color: 'L' },
-            'O': { shape:
+            'O': { shape: [[1,1],[1,1]], color: 'O' },
+            'S': { shape: [[0,1,1],[1,1,0],[0,0,0]], color: 'S' },
+            'T': { shape: [[0,1,0],[1,1,1],[0,0,0]], color: 'T' },
+            'Z': { shape: [[1,1,0],[0,1,1],[0,0,0]], color: 'Z' }
+        };
+        const PIECE_NAMES = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+
+        function createCells() {
+            boardElement.innerHTML = '';
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.id = `cell-${r}-${c}`;
+                    boardElement.appendChild(cell);
+                }
+            }
+            nextGridElement.innerHTML = '';
+            for (let i = 0; i < 16; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.id = `next-cell-${i}`;
+                nextGridElement.appendChild(cell);
+            }
+        }
+
+        function initBoardArray() {
+            board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+        }
+
+        function getNewPiece() {
+            const name = PIECE_NAMES[Math.floor(Math.random() * PIECE_NAMES.length)];
+            return { ...TETROMINOS[name], name };
+        }
+
+        function spawnPiece() {
+            currentPiece = nextPiece || getNewPiece();
+            nextPiece = getNewPiece();
+            pieceX = Math.floor(COLS / 2) - Math.floor(currentPiece.shape[0].length / 2);
+            pieceY = 0;
+            drawNextPiece();
+            if (!isValidMove(pieceX, pieceY, currentPiece.shape)) gameOver();
+        }
+
+        function drawBoard() {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    cell.className = 'cell';
+                    if (board[r][c]) cell.classList.add(board[r][c]);
+                }
+            }
+            currentPiece.shape.forEach((row, r) => {
+                row.forEach((value, c) => {
+                    if (value) {
+                        const targetR = pieceY + r;
+                        const targetC = pieceX + c;
+                        if (targetR >= 0 && targetR < ROWS && targetC >= 0 && targetC < COLS) {
+                            document.getElementById(`cell-${targetR}-${targetC}`).classList.add(currentPiece.color);
+                        }
+                    }
+                });
+            });
+        }
+
+        function drawNextPiece() {
+            for (let i = 0; i < 16; i++) {
+                document.getElementById(`next-cell-${i}`).className = 'cell';
+            }
+            nextPiece.shape.forEach((row, r) => {
+                row.forEach((value, c) => {
+                    if (value) {
+                        const idx = r * 4 + c;
+                        if (idx < 16) document.getElementById(`next-cell-${idx}`).classList.add(nextPiece.color);
+                    }
+                });
+            });
+        }
+
+        function isValidMove(newX, newY, shape) {
+            for (let r = 0; r < shape.length; r++) {
+                for (let c = 0; c < shape[r].length; c++) {
+                    if (shape[r][c]) {
+                        const tx = newX + c;
+                        const ty = newY + r;
+                        if (tx < 0 || tx >= COLS || ty >= ROWS) return false;
+                        if (ty >= 0 && board[ty][tx]) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function move(dx, dy) {
+            if (isValidMove(pieceX + dx, pieceY + dy, currentPiece.shape)) {
+                pieceX += dx;
+                pieceY += dy;
+                drawBoard();
+                return true;
+            } else if (dy === 1) {
+                lockPiece();
+                return false;
+            }
+            return false;
+        }
+
+        function rotate() {
+            const shape = currentPiece.shape;
+            const newShape = shape[0].map((_, i) => shape.map(row => row[i]).reverse());
+            if (isValidMove(pieceX, pieceY, newShape)) {
+                currentPiece.shape = newShape;
+                drawBoard();
+            }
+        }
+
+        function lockPiece() {
+            currentPiece.shape.forEach((row, r) => {
+                row.forEach((value, c) => {
+                    if (value && pieceY + r >= 0) board[pieceY + r][pieceX + c] = currentPiece.color;
+                });
+            });
+            clearLines();
+            spawnPiece();
+            drawBoard();
+        }
+
+        function clearLines() {
+            let lines = 0;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r].every(cell => cell !== 0)) {
+                    board.splice(r, 1);
+                    board.unshift(Array(COLS).fill(0));
+                    lines++;
+                    r++;
+                }
+            }
+            if (lines > 0) {
+                const pts = [0, 100, 300, 500, 800];
+                score += pts[lines];
+                scoreElement.textContent = score;
+            }
+        }
+
+        function handleKey(e) {
+            if (!gameLoopInterval) return;
+            if (e.key === 'ArrowLeft') move(-1, 0);
+            if (e.key === 'ArrowRight') move(1, 0);
+            if (e.key === 'ArrowDown') move(0, 1);
+            if (e.key === 'ArrowUp') rotate();
+            if (e.key === ' ') { while(move(0, 1)); }
+        }
+
+        function gameOver() {
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = null;
+            alert(`GAME OVER! 최종 점수: ${score}`);
+            startBtn.disabled = false;
+        }
+
+        function startGame() {
+            score = 0;
+            scoreElement.textContent = '0';
+            startBtn.disabled = true;
+            initBoardArray();
+            createCells();
+            nextPiece = getNewPiece();
+            spawnPiece();
+            drawBoard();
+            if (gameLoopInterval) clearInterval(gameLoopInterval);
+            gameLoopInterval = setInterval(() => move(0, 1), 500);
+        }
+
+        window.addEventListener('keydown', handleKey);
+        createCells();
+    </script>
+</body>
+</html>
